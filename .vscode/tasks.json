@@ -1,0 +1,31 @@
+{
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "gcc build active file",
+            "command": "/usr/bin/gcc",
+            "args": [
+                "-v",
+                "-g", "-gdwarf-4",
+                "-I/usr/include", "-I/usr/local/include", "-I/usr/local/include/SDL2",
+                "-L/usr/lib", "-L/usr/local/lib",
+                "-ldl", "-lSDL2", "-lSDL2_image",
+                "-Og", "-O0",
+                "${file}",
+                "-o",
+                "${fileDirname}/${fileBasenameNoExtension}.out",
+            ],
+            "options": {
+                "cwd": "/usr/bin"
+            },
+            "presentation": {
+                "reveal": "silent"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ],
+    "version": "2.0.0"
+}

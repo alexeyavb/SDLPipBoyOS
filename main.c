@@ -31,7 +31,7 @@ SDL_Renderer *renderer;
 bool SDL_InitComplete;
 bool lFlagQuit;
 
-struct dirent **namelist = NULL;            /* dirent structure to hold listing */
+static struct dirent **namelist = NULL;            /* dirent structure to hold listing */
 
 int sdfilt (const struct dirent *de);
 // int filesfromdir(void); 
@@ -59,7 +59,6 @@ int main(int argc, char *argv[]) {
     if(!SDL_InitComplete)
         return 100;
 
-
     while (true)
     {
         SDL_Event e;
@@ -74,7 +73,6 @@ int main(int argc, char *argv[]) {
             render_boot_anim(&e, DEF_FRAME_DELAY);
     }
 
-    // SDL_DestroyTexture(lettuce_tex);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     IMG_Quit();
@@ -83,7 +81,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-int load_anim(const char *dname){
+int read_anim_files(const char *dname){
     int ndir = scandir (dname, &namelist, sdfilt, alphasort);
     if (ndir < 0)
     {
@@ -96,7 +94,7 @@ int load_anim(const char *dname){
 void render_boot_anim(SDL_Event *e, const int frame_delay){    
     const char *boot_patch = IMG_BOOT_PATH;
     SDL_Texture* texture_array[DEF_ONE_SHOT_FRAMES];
-    int ndir = load_anim(boot_patch);
+    int ndir = read_anim_files(boot_patch);
 
     for(int i  = 0; i < ndir; i++){
         int textures_loaded = 0;
@@ -116,6 +114,8 @@ void render_boot_anim(SDL_Event *e, const int frame_delay){
                 printf("Error loading image: %s", IMG_GetError());
                 continue;
             }
+            // free mem from nameliist
+            free(namelist[i]);
 
             texture_array[j] = SDL_CreateTextureFromSurface(renderer, surface);
             if(NULL == texture_array[j]){
@@ -136,6 +136,7 @@ void render_boot_anim(SDL_Event *e, const int frame_delay){
             SDL_Delay(frame_delay);
         }
     }
+    free(namelist);
     lBootAnimRendered = true;
 }
 

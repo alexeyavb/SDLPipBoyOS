@@ -68,7 +68,7 @@ void render_current_screen(SDL_Event *e, const int frame_delay);
 
 
 #define DEF_ONE_SHOT_FRAMES 12   // more frames - more memory use!
-#define DEF_FRAME_DELAY 6       // avg delay (16) animation speed
+#define DEF_FRAME_DELAY 12       // avg delay (16) animation speed
 #define DEF_TICK_INTERVAL 30
 
 #define IMG_BOOT_PATH   "jpg/boot/"
@@ -79,6 +79,7 @@ void render_current_screen(SDL_Event *e, const int frame_delay);
 #define IMG_RADIO_PATH  "jpg/root/04-radio/"
 #define IMG_MAIL_PATH   "jpg/root/05-email/"
 #define IMG_SETUP_PATH  "jpg/root/06-settings/"
+
 // main menu variables
 enum OS_MainMenu {
     MM_STATUS = 0,
@@ -102,7 +103,6 @@ bool checkquitevent(SDL_Event *e){
             return true;
         }
     }
-
     return false;
 }
 

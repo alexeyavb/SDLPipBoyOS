@@ -28,29 +28,100 @@
 SDL_Window *window;
 SDL_Renderer *renderer;
 
+// System flags
 bool SDL_InitComplete;
 bool lFlagQuit;
 
+// animation frame names
 static struct dirent **namelist = NULL;            /* dirent structure to hold listing */
-
+// file names filtering
 int sdfilt (const struct dirent *de);
-// int filesfromdir(void); 
+
+// string concatenation
 char* concat(const char* str1, const char* str2);
 
-int SDL_Init_step(void);
-bool lBootAnimRendered;
-void render_boot_anim(SDL_Event *e, const int frame_delay);
+// userspace flags
+static bool lBootAnimRendered;
 
+// init defines
+int SDL_Init_step(void);
+
+// system routines
+void load_render_anim_direct(const char *boot_patch, SDL_Event *e, const int frame_delay);
+bool checkquitevent(SDL_Event *e);
+
+// main menu routines
+char* get_animation_patch(SDL_Event *e);
+void render_current_screen(SDL_Event *e, const int frame_delay);
+
+// magic defines
 #define DEF_SCREEN_WIDTH 800
 #define DEF_SCREEN_HEIGHT 480
 
-#define DEF_ONE_SHOT_FRAMES 12
-#define DEF_FRAME_DELAY 16
-#define IMG_BOOT_PATH "jpg/boot/"
+#ifndef MAGIC_DEMO_MODE
+    #define MAGIC_DEMO_MODE true
+#endif
+
+#ifndef MAGIC_DEMO_DELAY
+    #define MAGIC_DEMO_DELAY 3000
+#endif
+
+
+#define DEF_ONE_SHOT_FRAMES 12   // more frames - more memory use!
+#define DEF_FRAME_DELAY 6       // avg delay (16) animation speed
+#define DEF_TICK_INTERVAL 30
+
+#define IMG_BOOT_PATH   "jpg/boot/"
+#define IMG_STAT_PATH   "jpg/root/00-status/"
+#define IMG_INV_PATH    "jpg/root/01-inv/"
+#define IMG_DATA_PATH   "jpg/root/02-data/"
+#define IMG_MAP_PATH    "jpg/root/03-map/"
+#define IMG_RADIO_PATH  "jpg/root/04-radio/"
+#define IMG_MAIL_PATH   "jpg/root/05-email/"
+#define IMG_SETUP_PATH  "jpg/root/06-settings/"
+// main menu variables
+enum OS_MainMenu {
+    MM_STATUS = 0,
+    MM_INV,
+    MM_DATA,
+    MM_MAP,
+    MM_RADIO,
+};
+
+typedef enum OS_MainMenu *POS_MainMenu, **LPOS_MainMenu;
+static enum OS_MainMenu curren_mainmenu_itm = MM_STATUS;
+
+/// @brief inline definitions
+/// @param e SDL_Event
+bool checkquitevent(SDL_Event *e){
+    if (SDL_PollEvent(e))
+    {
+        if (e->type == SDL_QUIT)
+        {
+            lFlagQuit = true;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// calculate left time interval for next event
+uint32_t timeLeft(void){
+    static uint32_t next_time = 0;
+    uint32_t now_time;
+    now_time = SDL_GetTicks();
+    if(next_time <= now_time){
+        next_time = now_time + DEF_TICK_INTERVAL;
+        return 0;
+    }
+    return next_time - now_time;
+}
 
 
 // Just type [F5] to start debugging!
-int main(int argc, char *argv[]) {   
+int main(int argc, char *argv[]) {       
+    static uint32_t next_time = 0;
     lBootAnimRendered = false;
     lFlagQuit = false;
 
@@ -62,6 +133,7 @@ int main(int argc, char *argv[]) {
     while (true)
     {
         SDL_Event e;
+
         if (SDL_PollEvent(&e))
         {
             if (e.type == SDL_QUIT || lFlagQuit)
@@ -69,8 +141,25 @@ int main(int argc, char *argv[]) {
                 break;
             }
         }
-        if(!lBootAnimRendered)
-            render_boot_anim(&e, DEF_FRAME_DELAY);
+        
+        if(!lBootAnimRendered){
+            load_render_anim_direct(IMG_BOOT_PATH, &e, DEF_FRAME_DELAY);
+            lBootAnimRendered = true;
+            next_time = SDL_GetTicks() + MAGIC_DEMO_DELAY;
+        }
+        if(lBootAnimRendered){
+            render_current_screen(&e, DEF_FRAME_DELAY);            
+        }
+        if(MAGIC_DEMO_MODE){
+            uint32_t current_time = SDL_GetTicks();
+            if( current_time <= next_time)
+                continue;
+            curren_mainmenu_itm++;
+
+            if(curren_mainmenu_itm > MM_RADIO)
+                curren_mainmenu_itm = MM_STATUS;
+                next_time = SDL_GetTicks() + MAGIC_DEMO_DELAY;
+        }
     }
 
     SDL_DestroyRenderer(renderer);
@@ -91,30 +180,58 @@ int read_anim_files(const char *dname){
     return ndir;
 }
 
-void render_boot_anim(SDL_Event *e, const int frame_delay){    
-    const char *boot_patch = IMG_BOOT_PATH;
+void render_current_screen(SDL_Event *e, const int frame_delay){
+    char *current_path = get_animation_patch(e);
+    load_render_anim_direct(current_path, e, DEF_FRAME_DELAY);
+}
+
+char* get_animation_patch(SDL_Event *e){    
+
+    checkquitevent(e);
+    switch (curren_mainmenu_itm){
+        case MM_STATUS:{
+            return IMG_STAT_PATH;
+        }
+        case MM_INV:{
+            return IMG_INV_PATH;
+        }
+        case MM_DATA:{
+            return IMG_DATA_PATH;
+        }
+        case MM_MAP:{
+            return IMG_MAP_PATH;
+        }
+        case MM_RADIO:{
+            return IMG_RADIO_PATH;
+        }
+        default:{
+            return IMG_STAT_PATH;
+        }
+    }
+    return IMG_STAT_PATH;
+}
+
+void load_render_anim_direct(const char *boot_patch, SDL_Event *e, const int frame_delay){    
     SDL_Texture* texture_array[DEF_ONE_SHOT_FRAMES];
     int ndir = read_anim_files(boot_patch);
+    
+    if(ndir<=0)
+        return;
 
     for(int i  = 0; i < ndir; i++){
         int textures_loaded = 0;
         for(int j = 0; j < DEF_ONE_SHOT_FRAMES && i < ndir; j++){        
-            if (SDL_PollEvent(e))
-            {
-                if (e->type == SDL_QUIT)
-                {
-                    lFlagQuit = true;
-                    return;
-                }
-            }            
-            
+            if(checkquitevent(e)){
+                return;
+            };
+
             char *sname = namelist[i]->d_name; 
             SDL_Surface* surface = IMG_Load(concat(boot_patch, sname));
             if(NULL == surface){
                 printf("Error loading image: %s", IMG_GetError());
                 continue;
             }
-            // free mem from nameliist
+
             free(namelist[i]);
 
             texture_array[j] = SDL_CreateTextureFromSurface(renderer, surface);
@@ -137,7 +254,6 @@ void render_boot_anim(SDL_Event *e, const int frame_delay){
         }
     }
     free(namelist);
-    lBootAnimRendered = true;
 }
 
 

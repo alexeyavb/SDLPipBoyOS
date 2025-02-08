@@ -31,27 +31,30 @@ SDL_Renderer *renderer;
 bool SDL_InitComplete;
 bool lFlagQuit;
 
-int ndir = 0;                               /* num dirs scandir returns, -1 err */
 struct dirent **namelist = NULL;            /* dirent structure to hold listing */
 
 int sdfilt (const struct dirent *de);
-int filesfromdir(void); 
+// int filesfromdir(void); 
 char* concat(const char* str1, const char* str2);
 
 int SDL_Init_step(void);
-void render_disk_anim(SDL_Event *e);
+bool lBootAnimRendered;
+void render_boot_anim(SDL_Event *e, const int frame_delay);
 
+#define DEF_SCREEN_WIDTH 800
+#define DEF_SCREEN_HEIGHT 480
 
-#define ONE_SHOT_FRAMES 24
-SDL_Texture* texture_array[ONE_SHOT_FRAMES];
+#define DEF_ONE_SHOT_FRAMES 12
+#define DEF_FRAME_DELAY 16
+#define IMG_BOOT_PATH "jpg/boot/"
+
 
 // Just type [F5] to start debugging!
 int main(int argc, char *argv[]) {   
-
+    lBootAnimRendered = false;
     lFlagQuit = false;
 
     SDL_InitComplete = (0 == SDL_Init_step());
-    filesfromdir(); 
 
     if(!SDL_InitComplete)
         return 100;
@@ -67,8 +70,8 @@ int main(int argc, char *argv[]) {
                 break;
             }
         }
-
-        render_disk_anim(&e);
+        if(!lBootAnimRendered)
+            render_boot_anim(&e, DEF_FRAME_DELAY);
     }
 
     // SDL_DestroyTexture(lettuce_tex);
@@ -80,10 +83,24 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-void render_disk_anim(SDL_Event *e){
+int load_anim(const char *dname){
+    int ndir = scandir (dname, &namelist, sdfilt, alphasort);
+    if (ndir < 0)
+    {
+        perror("scandir return failed");  /* throw error & return on failure  */
+        return -1;
+    }
+    return ndir;
+}
+
+void render_boot_anim(SDL_Event *e, const int frame_delay){    
+    const char *boot_patch = IMG_BOOT_PATH;
+    SDL_Texture* texture_array[DEF_ONE_SHOT_FRAMES];
+    int ndir = load_anim(boot_patch);
+
     for(int i  = 0; i < ndir; i++){
         int textures_loaded = 0;
-        for(int j = 0; j < ONE_SHOT_FRAMES && i < ndir; j++){        
+        for(int j = 0; j < DEF_ONE_SHOT_FRAMES && i < ndir; j++){        
             if (SDL_PollEvent(e))
             {
                 if (e->type == SDL_QUIT)
@@ -94,7 +111,7 @@ void render_disk_anim(SDL_Event *e){
             }            
             
             char *sname = namelist[i]->d_name; 
-            SDL_Surface* surface = IMG_Load(concat("jpg/", sname));
+            SDL_Surface* surface = IMG_Load(concat(boot_patch, sname));
             if(NULL == surface){
                 printf("Error loading image: %s", IMG_GetError());
                 continue;
@@ -105,7 +122,7 @@ void render_disk_anim(SDL_Event *e){
                 printf( "Error creating texture" );
                 continue;
             }
-            
+
             SDL_FreeSurface(surface);
             textures_loaded++;
             i++;
@@ -116,10 +133,12 @@ void render_disk_anim(SDL_Event *e){
             SDL_RenderCopy(renderer, texture_array[animframe], NULL, NULL);
             SDL_RenderPresent(renderer);
             SDL_DestroyTexture(texture_array[animframe]);
-            SDL_Delay(21);
+            SDL_Delay(frame_delay);
         }
     }
+    lBootAnimRendered = true;
 }
+
 
 int SDL_Init_step(void){
 
@@ -135,7 +154,7 @@ int SDL_Init_step(void){
         return 2;
     }
 
-    window = SDL_CreateWindow("First program", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 480, SDL_WINDOW_OPENGL);
+    window = SDL_CreateWindow("First program", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, DEF_SCREEN_WIDTH, DEF_SCREEN_HEIGHT, SDL_WINDOW_OPENGL);
     if (window == NULL)
     {
         printf("Error window creation");
@@ -152,38 +171,83 @@ int SDL_Init_step(void){
     return 0;
 }
 
-int filesfromdir(void){
-    const char *dname = "jpg/";
 
-    /* call scandir to fill pointer to array of dirent entries  */
-    if ((ndir = scandir (dname, &namelist, sdfilt, alphasort)) < 0)
-    {
-        perror("scandir");  /* throw error & return on failure  */
-        return 1;
-    }
 
-    // size_t it = 0;                              /* simple iterator for dir list     */
-    // /* print each of the entries in alphasort order  */
-    // printf ("\nscandir example (alphasort):\n\n");
-    // for (it = 0; it < ndir; it++)
-    //     printf("  nl[%2zu] %s\n", it, namelist[it]->d_name);
+// Example of animation from disk
+// void render_disk_anim(SDL_Event *e){
+//     for(int i  = 0; i < ndir; i++){
+//         int textures_loaded = 0;
+//         for(int j = 0; j < ONE_SHOT_FRAMES && i < ndir; j++){        
+//             if (SDL_PollEvent(e))
+//             {
+//                 if (e->type == SDL_QUIT)
+//                 {
+//                     lFlagQuit = true;
+//                     return;
+//                 }
+//             }            
+            
+//             char *sname = namelist[i]->d_name; 
+//             SDL_Surface* surface = IMG_Load(concat("jpg/", sname));
+//             if(NULL == surface){
+//                 printf("Error loading image: %s", IMG_GetError());
+//                 continue;
+//             }
 
-    // /* print each entry in reverse sort order & free */
-    // printf ("\nreverse:\n\n");
-    // it = ndir;
-    // SDL_UNUSED char *sname;
-    // while (it--) {
-    //     sname = namelist[it]->d_name;
-    //     printf("  nl[%2zu] %s\n", it, sname);
-    //     if (namelist[it]->d_name)
-    //         free (namelist[it]);
-    // }
-    // free(namelist);
+//             texture_array[j] = SDL_CreateTextureFromSurface(renderer, surface);
+//             if(NULL == texture_array[j]){
+//                 printf( "Error creating texture" );
+//                 continue;
+//             }
+            
+//             SDL_FreeSurface(surface);
+//             textures_loaded++;
+//             i++;
+//         }
 
-    // printf ("\n");
+//         for(int animframe = 0; animframe < textures_loaded; animframe++){
+//             SDL_RenderClear(renderer);
+//             SDL_RenderCopy(renderer, texture_array[animframe], NULL, NULL);
+//             SDL_RenderPresent(renderer);
+//             SDL_DestroyTexture(texture_array[animframe]);
+//             SDL_Delay(21);
+//         }
+//     }
+// }
 
-    return 0;
-}
+// Example load files
+// int filesfromdir(void){
+//     const char *dname = "jpg/";
+
+//     /* call scandir to fill pointer to array of dirent entries  */
+//     if ((ndir = scandir (dname, &namelist, sdfilt, alphasort)) < 0)
+//     {
+//         perror("scandir");  /* throw error & return on failure  */
+//         return 1;
+//     }
+
+//     // size_t it = 0;                              /* simple iterator for dir list     */
+//     // /* print each of the entries in alphasort order  */
+//     // printf ("\nscandir example (alphasort):\n\n");
+//     // for (it = 0; it < ndir; it++)
+//     //     printf("  nl[%2zu] %s\n", it, namelist[it]->d_name);
+
+//     // /* print each entry in reverse sort order & free */
+//     // printf ("\nreverse:\n\n");
+//     // it = ndir;
+//     // SDL_UNUSED char *sname;
+//     // while (it--) {
+//     //     sname = namelist[it]->d_name;
+//     //     printf("  nl[%2zu] %s\n", it, sname);
+//     //     if (namelist[it]->d_name)
+//     //         free (namelist[it]);
+//     // }
+//     // free(namelist);
+
+//     // printf ("\n");
+
+//     return 0;
+// }
 
 
 
